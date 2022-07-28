@@ -45,3 +45,14 @@ export declare class EventRouter {
     private parseRoute;
     eventHandler(event: any): Promise<unknown>;
 }
+export declare class Router {
+    private routes;
+    constructor();
+    private addRoute;
+    get(path: string, handler: RouteHandler): void;
+    put(path: string, handler: RouteHandler): void;
+    post(path: string, handler: RouteHandler): void;
+    delete(path: string, handler: RouteHandler): void;
+    exportRoutes(): Route[];
+    attachRouter(path: string, router: Router): void;
+}

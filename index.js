@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EventRouter = void 0;
+exports.Router = exports.EventRouter = void 0;
 class EventRouter {
     constructor(params) {
         this.parsedRoutes = params.routes.map(route => this.parseRoute(route));
@@ -64,3 +64,36 @@ class EventRouter {
     }
 }
 exports.EventRouter = EventRouter;
+class Router {
+    constructor() {
+        this.routes = [];
+    }
+    addRoute(method, path, handler) {
+        this.routes.push({
+            path: path,
+            method: method,
+            handler: handler
+        });
+    }
+    get(path, handler) {
+        this.addRoute('GET', path, handler);
+    }
+    put(path, handler) {
+        this.addRoute('PUT', path, handler);
+    }
+    post(path, handler) {
+        this.addRoute('POST', path, handler);
+    }
+    delete(path, handler) {
+        this.addRoute('DELETE', path, handler);
+    }
+    exportRoutes() {
+        return this.routes;
+    }
+    attachRouter(path, router) {
+        router.exportRoutes().forEach(route => {
+            this.addRoute(route.method, `${path}${route.path}`, route.handler);
+        });
+    }
+}
+exports.Router = Router;

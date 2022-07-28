@@ -110,3 +110,47 @@ export class EventRouter {
   }
 
 }
+
+export class Router {
+
+  private routes: Route[];
+
+  constructor () {
+    this.routes = [];
+  }
+
+  private addRoute (method: RouteMethod, path: string, handler: RouteHandler ) {
+    this.routes.push({
+      path: path,
+      method: method,
+      handler: handler
+    });
+  }
+
+  public get (path: string, handler: RouteHandler) {
+    this.addRoute('GET', path, handler);
+  }
+
+  public put (path: string, handler: RouteHandler) {
+    this.addRoute('PUT', path, handler);
+  }
+
+  public post (path: string, handler: RouteHandler) {
+    this.addRoute('POST', path, handler);
+  }
+
+  public delete (path: string, handler: RouteHandler) {
+    this.addRoute('DELETE', path, handler);
+  }
+
+  public exportRoutes () {
+    return this.routes;
+  }
+
+  public attachRouter (path: string, router: Router) {
+    router.exportRoutes().forEach(route => {
+      this.addRoute(route.method, `${path}${route.path}`, route.handler)
+    })
+  }
+
+}
