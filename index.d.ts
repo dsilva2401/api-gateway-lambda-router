@@ -10,7 +10,7 @@ export interface RouteHandlerResponse {
     (params: RouteHandlerResponseParams): any;
 }
 export interface RouteHandler {
-    (request: RequestData, response: RouteHandlerResponse, next: Function): Promise<any>;
+    (request: RequestData, response: RouteHandlerResponse, next: Function): any;
 }
 export interface RequestData {
     method: RouteMethod;
