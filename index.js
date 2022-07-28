@@ -24,7 +24,7 @@ class EventRouter {
         return parsedRoute;
     }
     eventHandler(event) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const requestData = {
                 method: event.requestContext.http.method,
                 path: event.requestContext.http.path,
@@ -51,7 +51,7 @@ class EventRouter {
                 .filter(route => (event.requestContext.http.path.match(route.pathRegExp) &&
                 (event.requestContext.http.method === route.method || route.method === 'ANY')))[0];
             if (!matchingRouter) {
-                this.defaultHandler(requestData, responseHandler);
+                this.defaultHandler(requestData, responseHandler, () => { });
             }
             const pathSegments = event.requestContext.http.path.split('/');
             let pathParameters = {};
@@ -59,7 +59,22 @@ class EventRouter {
                 pathParameters[k] = pathSegments[matchingRouter.pathVariablesMap[k]];
             });
             requestData.pathParameters = pathParameters;
-            matchingRouter.handler(requestData, responseHandler);
+            if (!!matchingRouter.handler) {
+                matchingRouter.handler(requestData, responseHandler, () => { });
+                return;
+            }
+            let handlers = (matchingRouter.handlers || []).slice();
+            function executeHandlers() {
+                const buffHandler = handlers.shift();
+                if (!buffHandler) {
+                    responseHandler({ status: 200, data: '' });
+                    return;
+                }
+                buffHandler(requestData, responseHandler, () => {
+                    executeHandlers();
+                });
+            }
+            executeHandlers();
         });
     }
 }
@@ -68,31 +83,32 @@ class Router {
     constructor() {
         this.routes = [];
     }
-    addRoute(method, path, handler) {
-        this.routes.push({
+    addRoute(method, path, handlerOrHandlers) {
+        this.routes.push(Object.assign({
             path: path,
             method: method,
-            handler: handler
-        });
+        }, Array.isArray(handlerOrHandlers) ?
+            { handlers: handlerOrHandlers } :
+            { handler: handlerOrHandlers }));
     }
-    get(path, handler) {
-        this.addRoute('GET', path, handler);
+    get(path, handlerOrHandlers) {
+        this.addRoute('GET', path, handlerOrHandlers);
     }
-    put(path, handler) {
-        this.addRoute('PUT', path, handler);
+    put(path, handlerOrHandlers) {
+        this.addRoute('PUT', path, handlerOrHandlers);
     }
-    post(path, handler) {
-        this.addRoute('POST', path, handler);
+    post(path, handlerOrHandlers) {
+        this.addRoute('POST', path, handlerOrHandlers);
     }
-    delete(path, handler) {
-        this.addRoute('DELETE', path, handler);
+    delete(path, handlerOrHandlers) {
+        this.addRoute('DELETE', path, handlerOrHandlers);
     }
     exportRoutes() {
         return this.routes;
     }
     attachRouter(path, router) {
         router.exportRoutes().forEach(route => {
-            this.addRoute(route.method, `${path}${route.path}`, route.handler);
+            this.addRoute(route.method, `${path}${route.path}`, route.handler || route.handlers || []);
         });
     }
 }

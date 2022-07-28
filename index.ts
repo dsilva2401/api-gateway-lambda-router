@@ -10,7 +10,7 @@ export interface RouteHandlerResponse {
 }
 
 export interface RouteHandler {
-  (request: RequestData, response: RouteHandlerResponse): Promise<any>;
+  (request: RequestData, response: RouteHandlerResponse, next: Function): Promise<any>;
 }
 
 export interface RequestData {
@@ -26,8 +26,11 @@ export interface Route {
   strictPath?: boolean;
   path: string;
   method: RouteMethod;
-  handler: RouteHandler
+  handler?: RouteHandler;
+  handlers?: RouteHandler[];
 }
+
+export type RouteHandlerOneOrList = RouteHandler | RouteHandler[];
 
 export interface ParsedRoute extends Route {
   pathRegExp: RegExp;
@@ -69,7 +72,7 @@ export class EventRouter {
   }
 
   public eventHandler (event: any) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const requestData: RequestData = {
         method: event.requestContext.http.method,
         path: event.requestContext.http.path,
@@ -97,7 +100,7 @@ export class EventRouter {
           (event.requestContext.http.method === route.method || route.method === 'ANY')
         ))[0];
       if (!matchingRouter) {
-        this.defaultHandler(requestData, responseHandler);
+        this.defaultHandler(requestData, responseHandler, () => {});
       }
       const pathSegments = event.requestContext.http.path.split('/');
       let pathParameters: any = {}
@@ -105,7 +108,22 @@ export class EventRouter {
         pathParameters[k] = pathSegments[matchingRouter.pathVariablesMap[k]]
       })
       requestData.pathParameters = pathParameters;
-      matchingRouter.handler(requestData, responseHandler);
+      if (!!matchingRouter.handler) {
+        matchingRouter.handler(requestData, responseHandler, () => {});
+        return;
+      }
+      let handlers = (matchingRouter.handlers || []).slice();
+      function executeHandlers () {
+        const buffHandler = handlers.shift();
+        if (!buffHandler) { 
+          responseHandler({ status: 200, data: '' });
+          return;
+        } 
+        buffHandler(requestData, responseHandler, () => {
+          executeHandlers();
+        });
+      }
+      executeHandlers();
     })
   }
 
@@ -119,28 +137,34 @@ export class Router {
     this.routes = [];
   }
 
-  private addRoute (method: RouteMethod, path: string, handler: RouteHandler ) {
-    this.routes.push({
-      path: path,
-      method: method,
-      handler: handler
-    });
+  private addRoute (method: RouteMethod, path: string, handlerOrHandlers: RouteHandlerOneOrList ) {
+    this.routes.push(
+      Object.assign(
+        {
+          path: path,
+          method: method,
+        }, 
+        Array.isArray(handlerOrHandlers) ? 
+          { handlers: handlerOrHandlers } : 
+          { handler: handlerOrHandlers }
+        )
+    );
   }
 
-  public get (path: string, handler: RouteHandler) {
-    this.addRoute('GET', path, handler);
+  public get (path: string, handlerOrHandlers: RouteHandlerOneOrList) {
+    this.addRoute('GET', path, handlerOrHandlers);
   }
 
-  public put (path: string, handler: RouteHandler) {
-    this.addRoute('PUT', path, handler);
+  public put (path: string, handlerOrHandlers: RouteHandlerOneOrList) {
+    this.addRoute('PUT', path, handlerOrHandlers);
   }
 
-  public post (path: string, handler: RouteHandler) {
-    this.addRoute('POST', path, handler);
+  public post (path: string, handlerOrHandlers: RouteHandlerOneOrList) {
+    this.addRoute('POST', path, handlerOrHandlers);
   }
 
-  public delete (path: string, handler: RouteHandler) {
-    this.addRoute('DELETE', path, handler);
+  public delete (path: string, handlerOrHandlers: RouteHandlerOneOrList) {
+    this.addRoute('DELETE', path, handlerOrHandlers);
   }
 
   public exportRoutes () {
@@ -149,7 +173,7 @@ export class Router {
 
   public attachRouter (path: string, router: Router) {
     router.exportRoutes().forEach(route => {
-      this.addRoute(route.method, `${path}${route.path}`, route.handler)
+      this.addRoute(route.method, `${path}${route.path}`, route.handler || route.handlers || [])
     })
   }
 

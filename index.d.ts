@@ -10,7 +10,7 @@ export interface RouteHandlerResponse {
     (params: RouteHandlerResponseParams): any;
 }
 export interface RouteHandler {
-    (request: RequestData, response: RouteHandlerResponse): Promise<any>;
+    (request: RequestData, response: RouteHandlerResponse, next: Function): Promise<any>;
 }
 export interface RequestData {
     method: RouteMethod;
@@ -28,8 +28,10 @@ export interface Route {
     strictPath?: boolean;
     path: string;
     method: RouteMethod;
-    handler: RouteHandler;
+    handler?: RouteHandler;
+    handlers?: RouteHandler[];
 }
+export declare type RouteHandlerOneOrList = RouteHandler | RouteHandler[];
 export interface ParsedRoute extends Route {
     pathRegExp: RegExp;
     pathVariablesMap: any;
@@ -49,10 +51,10 @@ export declare class Router {
     private routes;
     constructor();
     private addRoute;
-    get(path: string, handler: RouteHandler): void;
-    put(path: string, handler: RouteHandler): void;
-    post(path: string, handler: RouteHandler): void;
-    delete(path: string, handler: RouteHandler): void;
+    get(path: string, handlerOrHandlers: RouteHandlerOneOrList): void;
+    put(path: string, handlerOrHandlers: RouteHandlerOneOrList): void;
+    post(path: string, handlerOrHandlers: RouteHandlerOneOrList): void;
+    delete(path: string, handlerOrHandlers: RouteHandlerOneOrList): void;
     exportRoutes(): Route[];
     attachRouter(path: string, router: Router): void;
 }
