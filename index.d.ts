@@ -46,6 +46,7 @@ export declare class EventRouter {
     constructor(params: EventRouterParams);
     private parseRoute;
     eventHandler(event: any): Promise<unknown>;
+    startLocalServer(port: number): void;
 }
 export declare class Router {
     private routes;

@@ -1,3 +1,5 @@
+import express from 'express';
+
 export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'ANY';
 
 export interface RouteHandlerResponseParams {
@@ -125,6 +127,50 @@ export class EventRouter {
       }
       executeHandlers();
     })
+  }
+
+  public startLocalServer (port: number) {
+    const app = express();
+    this.parsedRoutes.forEach(route => {
+      const expressMethod = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'all';
+      app[expressMethod](route.path, (req, res, next) => {
+        const requestData: RequestData = {
+          method: route.method,
+          path: route.path,
+          headers: req.headers,
+          queryParameters: req.query as any,
+          pathParameters: req.params,
+          body: req.body,
+        }
+        const responseHandler = (responseParams: RouteHandlerResponseParams) => {
+          res.status(responseParams.status || 200);
+          const headers = responseParams.headers || {}
+          Object.keys(headers).forEach(k => {
+            res.set(k, headers[k]);
+          })
+          res.send(responseParams.data);
+        }
+        if (!!route.handler) {
+          route.handler(requestData, responseHandler, next);
+          return;
+        }
+        let handlers = (route.handlers || []).slice();
+        function executeHandlers () {
+          const buffHandler = handlers.shift();
+          if (!buffHandler) { 
+            responseHandler({ status: 200, data: '' });
+            return;
+          } 
+          buffHandler(requestData, responseHandler, () => {
+            executeHandlers();
+          });
+        }
+        executeHandlers();
+      });
+    });
+    app.listen(port, () => {
+      console.log(`Server started at port ${port}`);
+    });
   }
 
 }

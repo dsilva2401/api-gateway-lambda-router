@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Router = exports.EventRouter = void 0;
+const express_1 = __importDefault(require("express"));
 class EventRouter {
     constructor(params) {
         this.parsedRoutes = params.routes.map(route => this.parseRoute(route));
@@ -75,6 +79,49 @@ class EventRouter {
                 });
             }
             executeHandlers();
+        });
+    }
+    startLocalServer(port) {
+        const app = (0, express_1.default)();
+        this.parsedRoutes.forEach(route => {
+            const expressMethod = route.method.toLowerCase();
+            app[expressMethod](route.path, (req, res, next) => {
+                const requestData = {
+                    method: route.method,
+                    path: route.path,
+                    headers: req.headers,
+                    queryParameters: req.query,
+                    pathParameters: req.params,
+                    body: req.body,
+                };
+                const responseHandler = (responseParams) => {
+                    res.status(responseParams.status || 200);
+                    const headers = responseParams.headers || {};
+                    Object.keys(headers).forEach(k => {
+                        res.set(k, headers[k]);
+                    });
+                    res.send(responseParams.data);
+                };
+                if (!!route.handler) {
+                    route.handler(requestData, responseHandler, next);
+                    return;
+                }
+                let handlers = (route.handlers || []).slice();
+                function executeHandlers() {
+                    const buffHandler = handlers.shift();
+                    if (!buffHandler) {
+                        responseHandler({ status: 200, data: '' });
+                        return;
+                    }
+                    buffHandler(requestData, responseHandler, () => {
+                        executeHandlers();
+                    });
+                }
+                executeHandlers();
+            });
+        });
+        app.listen(port, () => {
+            console.log(`Server started at port ${port}`);
         });
     }
 }
